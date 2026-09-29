@@ -16,12 +16,12 @@ ANONYMOUS_USER = "anonymous"
 
 
 def verify_api_key(
-    x_api_key: str | None = Header(default=None),
-    x_user_id: str | None = Header(default=None),
+   x_api_key: str | None = Header(default=None),
+   x_user_id: str | None = Header(default=None),
 ) -> str:
-    """Kiểm tra header ``X-API-Key``; trả về user_id nếu hợp lệ.
+   """Kiểm tra header ``X-API-Key``; trả về user_id nếu hợp lệ.
 
-    TODO (CP3):
+   TODO (CP3):
       1. Lấy khóa đúng từ ``get_settings().agent_api_key``.
       2. Nếu ``x_api_key`` là None hoặc không khớp → raise
          ``HTTPException(status_code=401, detail="invalid or missing API key")``.
@@ -33,5 +33,8 @@ def verify_api_key(
          ``ANONYMOUS_USER``. user_id này là đơn vị để rate limit và tính chi phí.
 
     Gợi ý: dùng ``status.HTTP_401_UNAUTHORIZED`` cho dễ đọc.
-    """
-    raise NotImplementedError("TODO (CP3): cài đặt verify_api_key")
+   """
+   key = get_settings().agent_api_key
+   if x_api_key is None or not secrets.compare_digest(x_api_key, key):
+      raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid or missing API key")
+   return x_user_id or ANONYMOUS_USER
