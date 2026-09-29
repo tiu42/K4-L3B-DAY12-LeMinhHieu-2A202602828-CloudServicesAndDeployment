@@ -21,14 +21,47 @@
 #            docker images day12-agent:prod     # xem dung lượng
 # ═══════════════════════════════════════════════════════════════════
 
-FROM python:3.11
+# =========================
+# Stage 1: Builder
+# =========================
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
+# Copy requirements trước để tận dụng Docker cache
+COPY requirements.txt .
+
+# Cài dependencies vào thư mục riêng
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+# =========================
+# Stage 2: Runtime
+# =========================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy dependencies từ builder
+COPY --from=builder /install /usr/local
+
+# Sau khi requirements đã được cài,
+# mới copy source code
 COPY . .
 
-RUN pip install -r requirements.txt
+# Tạo user thường
+RUN useradd --create-home --shell /bin/bash appuser
+
+# Container chạy bằng user thường
+USER appuser
+
+# PORT mặc định là 8000 nhưng có thể bị cloud override
+ENV PORT=8000
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Health check endpoint /health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8000') + '/health')" || exit 1
+
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
